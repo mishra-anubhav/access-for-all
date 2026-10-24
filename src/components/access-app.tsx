@@ -3,9 +3,10 @@
 import {
   Accessibility, ArrowDownToLine, ArrowRight, BookOpen, Bookmark, Check, ChevronDown,
   CircleHelp, Clock3, Copy, Expand, FileText, Headphones, Languages, LayoutDashboard, LoaderCircle,
-  Menu, Mic, MicOff, Minimize2, Moon, PanelRight, Plus, Search, Send, Settings2,
+  Menu, Mic, MicOff, Minimize2, Moon, PanelRight, Pencil, Plus, Search, Send, Settings2,
   ShieldCheck, Sparkles, Sun, Waves, X,
 } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessLogo } from "@/components/access-logo";
 
@@ -24,6 +25,7 @@ const fmtTime = (time: number) => new Intl.DateTimeFormat(undefined, { hour: "2-
 
 export default function AccessApp() {
   const [page, setPage] = useState<Page>("live");
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [dark, setDark] = useState(false);
   const [highContrast, setHighContrast] = useState(false);
@@ -31,6 +33,11 @@ export default function AccessApp() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [language, setLanguage] = useState<Language>("en");
   const [level, setLevel] = useState("beginner");
+  const [profileName, setProfileName] = useState("Attendee");
+  const [profileRole, setProfileRole] = useState("");
+  const [profileDraftName, setProfileDraftName] = useState("Attendee");
+  const [profileDraftRole, setProfileDraftRole] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
   const [fontSize, setFontSize] = useState(22);
   const [lineSpacing, setLineSpacing] = useState(1.65);
   const [listening, setListening] = useState(false);
@@ -73,6 +80,9 @@ export default function AccessApp() {
   const transcriptEnd = useRef<HTMLDivElement>(null);
   const askButtonRef = useRef<HTMLButtonElement>(null);
   const assistantWasOpen = useRef(false);
+  const profileNameInputRef = useRef<HTMLInputElement>(null);
+  const profileEditButtonRef = useRef<HTMLButtonElement>(null);
+  const profileWasOpen = useRef(false);
 
   useEffect(() => { activeSessionRef.current = newSessionId(); }, []);
   useEffect(() => {
@@ -80,16 +90,20 @@ export default function AccessApp() {
       const prefs = JSON.parse(localStorage.getItem("accessforall:prefs") || "{}");
       setDark(Boolean(prefs.dark)); setHighContrast(Boolean(prefs.highContrast)); setLargeText(Boolean(prefs.largeText));
       setReducedMotion(Boolean(prefs.reducedMotion)); setLanguage(prefs.language || "en"); setLevel(prefs.level || "beginner");
+      setProfileName(typeof prefs.profileName === "string" && prefs.profileName.trim() ? prefs.profileName : "Attendee");
+      setProfileRole(typeof prefs.profileRole === "string" ? prefs.profileRole : "");
       const storedCaptionSize = Number(prefs.fontSize);
       setFontSize(Number.isFinite(storedCaptionSize) && storedCaptionSize > 0 ? storedCaptionSize : 22);
       setLineSpacing(Number(prefs.lineSpacing) || 1.65);
       setNotes(JSON.parse(localStorage.getItem("accessforall:notes") || "[]"));
     } catch { /* use accessible defaults */ }
+    finally { setPreferencesLoaded(true); }
   }, []);
   useEffect(() => {
-    localStorage.setItem("accessforall:prefs", JSON.stringify({ dark, highContrast, largeText, reducedMotion, language, level, fontSize, lineSpacing }));
-  }, [dark, highContrast, largeText, reducedMotion, language, level, fontSize, lineSpacing]);
-  useEffect(() => { localStorage.setItem("accessforall:notes", JSON.stringify(notes)); }, [notes]);
+    if (!preferencesLoaded) return;
+    localStorage.setItem("accessforall:prefs", JSON.stringify({ dark, highContrast, largeText, reducedMotion, language, level, fontSize, lineSpacing, profileName, profileRole }));
+  }, [preferencesLoaded, dark, highContrast, largeText, reducedMotion, language, level, fontSize, lineSpacing, profileName, profileRole]);
+  useEffect(() => { if (preferencesLoaded) localStorage.setItem("accessforall:notes", JSON.stringify(notes)); }, [preferencesLoaded, notes]);
   useEffect(() => {
     if (!listening) return;
     const interval = window.setInterval(() => setElapsed((value) => value + 1), 1000);
@@ -100,7 +114,7 @@ export default function AccessApp() {
   }, [segments, partial, page, reducedMotion]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setFocusMode(false); setAssistantOpen(false); }
+      if (event.key === "Escape") { setFocusMode(false); setAssistantOpen(false); setProfileOpen(false); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -110,6 +124,11 @@ export default function AccessApp() {
     else if (assistantWasOpen.current && !focusMode) askButtonRef.current?.focus();
     assistantWasOpen.current = assistantOpen;
   }, [assistantOpen, focusMode]);
+  useEffect(() => {
+    if (profileOpen) profileNameInputRef.current?.focus();
+    else if (profileWasOpen.current) profileEditButtonRef.current?.focus();
+    profileWasOpen.current = profileOpen;
+  }, [profileOpen]);
   useEffect(() => () => {
     if (analyserFrame.current !== null) cancelAnimationFrame(analyserFrame.current);
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -275,10 +294,19 @@ export default function AccessApp() {
   };
   const copyText = async (body: string) => { await navigator.clipboard.writeText(body); setAnnounce("Copied to clipboard."); };
   const openPage = (target: Page) => { setPage(target); setMobileNav(false); };
+  const openProfileEditor = () => { setProfileDraftName(profileName); setProfileDraftRole(profileRole); setProfileOpen(true); };
+  const saveProfile = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextName = profileDraftName.trim();
+    if (!nextName) return;
+    setProfileName(nextName.slice(0, 80)); setProfileRole(profileDraftRole.trim().slice(0, 80));
+    setProfileOpen(false); setAnnounce("Profile updated and saved on this device.");
+  };
   const changeLanguage = (nextLanguage: Language) => {
     setLanguage(nextLanguage);
     if (nextLanguage !== "en") segments.filter((segment) => !segment.translation).forEach((segment) => void translateSegment(segment, nextLanguage));
   };
+  const profileInitials = profileName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase()).join("") || "A";
   const elapsedLabel = `${Math.floor(elapsed / 60).toString().padStart(2, "0")}:${(elapsed % 60).toString().padStart(2, "0")}`;
 
   return <div className={`app-shell ${dark ? "theme-dark" : ""} ${highContrast ? "high-contrast" : ""} ${largeText ? "large-text" : ""} ${reducedMotion ? "reduce-motion" : ""}`}>
@@ -294,7 +322,7 @@ export default function AccessApp() {
         <NavButton active={page === "explore"} icon={<Search />} label="Explore" onClick={() => openPage("explore")} />
         <NavButton active={page === "settings"} icon={<Settings2 />} label="Settings" onClick={() => openPage("settings")} />
       </nav>
-      <div className="sidebar-user"><div className="avatar">A</div><div className="user-copy"><strong>Attendee</strong><span>{languages.find((item) => item.code === language)?.native} · {level}</span></div><button className="icon-button small" onClick={() => setDark(!dark)} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button></div>
+      <div className="sidebar-user"><div className="avatar" aria-hidden="true">{profileInitials}</div><div className="user-copy"><strong>{profileName}</strong><span>{profileRole || `${languages.find((item) => item.code === language)?.native} · ${level}`}</span></div><button ref={profileEditButtonRef} className="icon-button profile-edit-button" onClick={openProfileEditor} aria-label="Edit profile" title="Edit profile"><Pencil size={17} /></button><button className="icon-button small" onClick={() => setDark(!dark)} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button></div>
     </aside>
 
     <main className="main-shell" id="main-content">
@@ -306,7 +334,7 @@ export default function AccessApp() {
       <div className="page-content" key={page}>
         {page === "home" && <section className="dashboard-page home-workspace">
           <div className="home-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR WORKSPACE</div><h1>Good to see you.</h1><p>Pick up where you left off or start listening.</p></div><button className="button button-primary" onClick={() => openPage("live")}><Mic size={17} /> Start listening</button></div>
-          <div className="home-session"><div className="home-session-icon"><Waves size={21} /></div><div className="home-session-copy"><span>READY WHEN YOU ARE</span><h2>Bring the room into focus.</h2><p>Live captions, translation, and clear explanations in one place.</p></div><button className="button button-primary" onClick={() => openPage("live")}>Open live session <ArrowRight size={16} /></button></div>
+          <div className="home-session"><div className="home-session-icon"><Waves size={21} /></div><div className="home-session-copy"><span>READY WHEN YOU ARE</span><h2>Bring the room into focus.</h2><p>Live captions, translation, and clear explanations in one place.</p></div><div className="home-session-art motion-art" aria-hidden="true"><Image src="/images/live-voice-illustration.webp" alt="" width={1024} height={1024} /></div><button className="button button-primary" onClick={() => openPage("live")}>Open live session <ArrowRight size={16} /></button></div>
           <div className="home-section-heading"><h2>Pick up a thread</h2><button className="text-link" onClick={() => openPage("notes")}>All notes <ArrowRight size={14} /></button></div>
           {notes.length ? <div className="home-notes-list">{notes.slice(0, 3).map((note) => <button key={note.id} className="home-note-row" onClick={() => { setCurrentNote(note.body); setAnswer(""); openPage("notes"); }}><span className="home-note-time">{fmtTime(note.createdAt)}</span><span className="home-note-title">{note.title}</span><span className="home-note-preview">{note.body.slice(0, 100)}</span><ArrowRight size={16} /></button>)}</div> : <p className="home-empty-line">Your saved session notes will appear here when you choose to save them.</p>}
           <div className="home-bottom-links"><button onClick={() => openPage("explore")}><Search size={17} /><span><strong>Explore sessions</strong><small>Find a talk that fits your interests</small></span><ArrowRight size={15} /></button><button onClick={() => openPage("settings")}><Accessibility size={17} /><span><strong>Your access preferences</strong><small>Language, captions, contrast, and motion</small></span><ArrowRight size={15} /></button></div>
@@ -320,7 +348,7 @@ export default function AccessApp() {
           <div className="live-layout"><div className="transcript-column"><div className="panel transcript-panel"><div className="transcript-head"><div><span className="live-label"><span className={listening ? "pulse-dot" : "idle-dot"} /> {listening ? "LIVE CAPTIONS" : "SESSION TRANSCRIPT"}</span><h2>Follow the conversation</h2></div><button className="more-button" onClick={() => setSavedSession(!savedSession)} aria-label={savedSession ? "Session marked saved" : "Save this session"}><Bookmark size={18} className={savedSession ? "saved-bookmark" : ""} /></button></div>
             <div className="caption-options"><span>ORIGINAL CAPTIONS <b>·</b> {languages.find((item) => item.code === "en")?.native}</span>{language !== "en" && <span className="caption-tag">{translationLag ? "Translation catching up…" : `TRANSLATION · ${languages.find((item) => item.code === language)?.native}`}</span>}</div>
             <div className="transcript-body" style={{ "--caption-size": `${fontSize}px`, "--caption-leading": lineSpacing } as React.CSSProperties} aria-label="Live transcript">
-              {!segments.length && !partial && <div className="transcript-empty"><div className="empty-wave"><Waves size={25} /></div><strong>Your captions will appear here</strong><p>Start listening to follow the speaker in real time.</p><span>Finalized captions stay in this session until you leave.</span></div>}
+              {!segments.length && !partial && <div className="transcript-empty"><Image className="live-empty-art motion-art" src="/images/live-voice-illustration.webp" alt="" aria-hidden="true" width={1024} height={1024} /><strong>Your captions will appear here</strong><p>Start listening to follow the speaker in real time.</p><span>Finalized captions stay in this session until you leave.</span></div>}
               {segments.map((segment) => <article className="caption-block" key={segment.id}><div className="caption-meta"><time>{fmtTime(segment.createdAt)}</time><span>Speaker</span></div><p>{segment.text}</p>{language !== "en" && <div className="translation-line" lang={language}><span>{languages.find((item) => item.code === language)?.native}</span><p className="translated-caption">{segment.translation || <span className="translation-pending"><LoaderCircle size={13} /> Translation catching up</span>}</p></div>}</article>)}
               {partial && <article className="caption-block partial-block"><div className="caption-meta"><time>{fmtTime(Date.now())}</time><span className="partial-label">In progress</span></div><p>{partial}<span className="cursor-dot" /></p></article>}
               <div ref={transcriptEnd} />
@@ -343,18 +371,36 @@ export default function AccessApp() {
           {agentLoading && <div className="panel note-loading"><LoaderCircle size={17} /> AccessForAll is organizing your notes…</div>}
           {answer && <div className="panel generated-note"><div className="generated-note-head"><div><span className="live-label"><Sparkles size={13} /> GENERATED WITH TRUEFORGE</span><h2>Session summary</h2></div><div className="note-buttons"><button className="icon-button" onClick={() => void copyText(answer)} aria-label="Copy notes"><Copy size={16} /></button><button className="icon-button" onClick={() => downloadNote(answer)} aria-label="Download Markdown"><ArrowDownToLine size={16} /></button></div></div><NoteBody content={answer} /><div className="generated-note-foot"><span>Review before sharing · AI may miss or misstate details</span><button className="button button-secondary compact" onClick={() => { setCurrentNote(answer); saveNotes(); }}><Bookmark size={14} /> Save to this device</button></div></div>}
           <div className="saved-notes-grid">{notes.filter((note) => `${note.title} ${note.body}`.toLowerCase().includes(noteSearch.toLowerCase())).map((note) => <article className="panel saved-note-card" key={note.id}><div className="saved-note-head"><span className="recent-icon"><FileText size={18} /></span><button className="icon-button" aria-label="Download note" onClick={() => downloadNote(note.body, note.title.toLowerCase().replaceAll(" ", "-"))}><ArrowDownToLine size={16} /></button></div><span className="note-date">{new Date(note.createdAt).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}</span><h3>{note.title}</h3><p>{note.body.slice(0, 180)}{note.body.length > 180 ? "…" : ""}</p><button className="text-link" onClick={() => { setCurrentNote(note.body); setAnswer(""); }}>Open notes <ArrowRight size={14} /></button></article>)}</div>
-          {!notes.length && !answer && !agentLoading && <div className="notes-empty"><div className="notes-empty-icon"><BookOpen size={25} /></div><h2>Keep what changes how you think.</h2><p>When a session gives you an idea worth returning to, create a clear summary and save it here. Nothing is kept until you choose.</p><button className="button button-secondary" onClick={() => openPage("live")}><Mic size={15} /> Start a live session</button></div>}
+          {!notes.length && !answer && !agentLoading && <div className="notes-empty"><Image className="notes-empty-art motion-art" src="/images/notebook-illustration.webp" alt="" aria-hidden="true" width={1024} height={1024} /><h2>Keep what changes how you think.</h2><p>When a session gives you an idea worth returning to, create a clear summary and save it here. Nothing is kept until you choose.</p><div className="notes-empty-actions"><Image className="notes-action-art notes-action-left motion-art" src="/images/live-voice-illustration.webp" alt="" aria-hidden="true" width={1024} height={1024} /><button className="button button-secondary" onClick={() => openPage("live")}><Mic size={15} /> Start a live session</button><Image className="notes-action-art notes-action-right motion-art" src="/images/conference-room-illustration.webp" alt="" aria-hidden="true" width={1024} height={1024} /></div></div>}
           {currentNote && !answer && <div className="panel generated-note"><div className="generated-note-head"><div><span className="live-label">SAVED ON THIS DEVICE</span><h2>Session notes</h2></div><button className="icon-button" onClick={() => setCurrentNote("")} aria-label="Close note"><X size={16} /></button></div><NoteBody content={currentNote} /><div className="generated-note-foot"><span>Stored only in this browser</span><button className="button button-secondary compact" onClick={() => downloadNote(currentNote)}><ArrowDownToLine size={14} /> Download</button></div></div>}
         </section>}
 
-        {page === "explore" && <section className="explore-page"><div className="page-title-row"><div><div className="eyebrow">FIND YOUR NEXT IDEA</div><h1>Explore sessions</h1><p>Find talks that fit your interests, schedule, and access needs.</p></div><div className="sample-agenda-chip"><span className="sample-dot" /> SAMPLE AGENDA</div></div><div className="explore-grid"><div className="panel explore-form"><div className="explore-form-head"><span className="explore-icon"><Search size={19} /></span><div><h2>What would you like to explore?</h2><p>Share a little about what helps you learn.</p></div></div><label htmlFor="interests">Your interests and goals</label><textarea id="interests" value={interest} onChange={(event) => setInterest(event.target.value)} placeholder="I'm new to AI, interested in healthcare startups, and prefer beginner-friendly explanations…" rows={5} /><div className="explore-prefs"><div><span>Preferred language</span><strong>{languages.find((item) => item.code === language)?.native}</strong></div><div><span>Explanation level</span><strong>{level}</strong></div><div><span>Available time</span><select aria-label="Available time"><option>Any time</option><option>Morning</option><option>Afternoon</option></select></div></div><button className="button button-primary full-button" disabled={agentLoading || !interest.trim()} onClick={() => void runAgent("recommend", `Recommend schedule items for this attendee: ${interest.trim()}. Preferred language: ${languages.find((item) => item.code === language)?.name}. Explanation level: ${level}. Use only the sample schedule tool and clearly label all data as sample, not verified.`)}>{agentLoading ? <LoaderCircle size={16} /> : <Sparkles size={16} />} Build my session plan <ArrowRight size={15} /></button><div className="agenda-upload"><label className="upload-label" htmlFor="agenda-upload"><Plus size={15} /> Add an agenda text or CSV</label><input className="sr-only" id="agenda-upload" type="file" accept=".txt,.csv,text/plain,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 1_000_000) { setError("Please choose an agenda under 1 MB."); return; } setScheduleFile(file.name); void file.text().then((text) => setInterest((value) => `${value}${value ? "\n\n" : ""}Agenda text (unverified upload):\n${text.slice(0, 10000)}`)); }} /><span>PDF agenda parsing is not included in this MVP. Uploaded text is sent to the agent only when you request recommendations.</span>{scheduleFile && <small>Added: {scheduleFile}</small>}</div></div><div className="explore-side"><div className="agenda-label"><span>AGENDA PREVIEW</span><span className="sample-label">Sample demo data · not verified</span></div>{[["10:00 AM", "AI Agents in the Real World", "Room A", "Tool use · human oversight"], ["11:15 AM", "Building Inclusive Healthcare Startups", "Room C", "Healthcare · product access"], ["1:00 PM", "RAG, Clearly Explained", "Room B", "Beginner friendly · sample captions listed"]].map(([time, title, room, theme]) => <div className="agenda-card" key={title}><div className="agenda-time">{time}</div><div className="agenda-card-content"><strong>{title}</strong><span>{room} <span>·</span> {theme}</span></div><Bookmark size={16} /></div>)}</div></div>{agentLoading && <div className="panel note-loading"><LoaderCircle size={17} /> Looking for a good fit…</div>}{answer && page === "explore" && <div className="panel generated-note"><div className="generated-note-head"><h2>Your personalized plan</h2><span className="sample-label">Sample data only</span></div><div className="note-markdown"><pre>{answer}</pre></div></div>}{error && <div className="inline-error" role="alert"><CircleHelp size={16} />{error}<button onClick={() => setError("")} aria-label="Dismiss error"><X size={14} /></button></div>}</section>}
+        {page === "explore" && <section className="explore-page"><div className="page-title-row"><div><div className="eyebrow">FIND YOUR NEXT IDEA</div><h1>Explore sessions</h1><p>Find talks that fit your interests, schedule, and access needs.</p></div><div className="explore-heading-art motion-art" aria-hidden="true"><Image src="/images/conference-room-illustration.webp" alt="" width={1024} height={1024} /><span className="sample-agenda-chip"><span className="sample-dot" /> SAMPLE AGENDA</span></div></div><div className="explore-grid"><div className="panel explore-form"><div className="explore-form-head"><span className="explore-icon"><Search size={19} /></span><div><h2>What would you like to explore?</h2><p>Share a little about what helps you learn.</p></div></div><label htmlFor="interests">Your interests and goals</label><textarea id="interests" value={interest} onChange={(event) => setInterest(event.target.value)} placeholder="I'm new to AI, interested in healthcare startups, and prefer beginner-friendly explanations…" rows={5} /><div className="explore-prefs"><div><span>Preferred language</span><strong>{languages.find((item) => item.code === language)?.native}</strong></div><div><span>Explanation level</span><strong>{level}</strong></div><div><span>Available time</span><select aria-label="Available time"><option>Any time</option><option>Morning</option><option>Afternoon</option></select></div></div><button className="button button-primary full-button" disabled={agentLoading || !interest.trim()} onClick={() => void runAgent("recommend", `Recommend schedule items for this attendee: ${interest.trim()}. Preferred language: ${languages.find((item) => item.code === language)?.name}. Explanation level: ${level}. Use only the sample schedule tool and clearly label all data as sample, not verified.`)}>{agentLoading ? <LoaderCircle size={16} /> : <Sparkles size={16} />} Build my session plan <ArrowRight size={15} /></button><div className="agenda-upload"><label className="upload-label" htmlFor="agenda-upload"><Plus size={15} /> Add an agenda text or CSV</label><input className="sr-only" id="agenda-upload" type="file" accept=".txt,.csv,text/plain,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 1_000_000) { setError("Please choose an agenda under 1 MB."); return; } setScheduleFile(file.name); void file.text().then((text) => setInterest((value) => `${value}${value ? "\n\n" : ""}Agenda text (unverified upload):\n${text.slice(0, 10000)}`)); }} /><span>PDF agenda parsing is not included in this MVP. Uploaded text is sent to the agent only when you request recommendations.</span>{scheduleFile && <small>Added: {scheduleFile}</small>}</div></div><div className="explore-side"><div className="agenda-label"><span>AGENDA PREVIEW</span><span className="sample-label">Sample demo data · not verified</span></div>{[["10:00 AM", "AI Agents in the Real World", "Room A", "Tool use · human oversight"], ["11:15 AM", "Building Inclusive Healthcare Startups", "Room C", "Healthcare · product access"], ["1:00 PM", "RAG, Clearly Explained", "Room B", "Beginner friendly · sample captions listed"]].map(([time, title, room, theme]) => <div className="agenda-card" key={title}><div className="agenda-time">{time}</div><div className="agenda-card-content"><strong>{title}</strong><span>{room} <span>·</span> {theme}</span></div><Bookmark size={16} /></div>)}</div></div>{agentLoading && <div className="panel note-loading"><LoaderCircle size={17} /> Looking for a good fit…</div>}{answer && page === "explore" && <div className="panel generated-note"><div className="generated-note-head"><h2>Your personalized plan</h2><span className="sample-label">Sample data only</span></div><div className="note-markdown"><pre>{answer}</pre></div></div>}{error && <div className="inline-error" role="alert"><CircleHelp size={16} />{error}<button onClick={() => setError("")} aria-label="Dismiss error"><X size={14} /></button></div>}</section>}
 
-        {page === "settings" && <section className="settings-page"><div className="page-title-row"><div><div className="eyebrow">MAKE IT WORK FOR YOU</div><h1>Accessibility settings</h1><p>Your preferences are saved on this device.</p></div><span className="settings-shield"><ShieldCheck size={18} /> Private by default</span></div><div className="settings-layout"><div className="settings-main"><div className="panel setting-section"><div className="setting-head"><span className="setting-icon language-setting"><Languages size={18} /></span><div><h2>Language & understanding</h2><p>Choose how AccessForAll communicates.</p></div></div><div className="setting-row"><div><strong>Preferred language</strong><span>Used for translation and AI explanations.</span></div><select value={language} onChange={(event) => changeLanguage(event.target.value as Language)} aria-label="Preferred language">{languages.map((item) => <option key={item.code} value={item.code}>{item.name} · {item.native}</option>)}</select></div><div className="setting-row"><div><strong>Explanation level</strong><span>Choose the amount of technical detail.</span></div><select value={level} onChange={(event) => setLevel(event.target.value)} aria-label="Explanation level"><option value="beginner">Beginner · plain language</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced · more technical</option></select></div></div>
+        {page === "settings" && <section className="settings-page"><div className="page-title-row"><div><div className="eyebrow">MAKE IT WORK FOR YOU</div><h1>Accessibility settings</h1><p>Your preferences are saved on this device.</p></div><span className="settings-shield"><ShieldCheck size={18} /> Private by default</span></div><div className="settings-layout"><div className="settings-main"><div className="panel setting-section profile-settings-section"><div className="setting-head"><span className="profile-avatar" aria-hidden="true">{profileInitials}</span><div><h2>Profile</h2><p>Edit the name and role shown in your workspace.</p></div><button className="button button-secondary" onClick={openProfileEditor}><Pencil size={15} /> Edit profile</button></div><div className="profile-preview"><strong>{profileName}</strong><span>{profileRole || "Add a role or team (optional)"}</span></div></div><div className="panel setting-section"><div className="setting-head"><span className="setting-icon language-setting"><Languages size={18} /></span><div><h2>Language & understanding</h2><p>Choose how AccessForAll communicates.</p></div></div><div className="setting-row"><div><strong>Preferred language</strong><span>Used for translation and AI explanations.</span></div><select value={language} onChange={(event) => changeLanguage(event.target.value as Language)} aria-label="Preferred language">{languages.map((item) => <option key={item.code} value={item.code}>{item.name} · {item.native}</option>)}</select></div><div className="setting-row"><div><strong>Explanation level</strong><span>Choose the amount of technical detail.</span></div><select value={level} onChange={(event) => setLevel(event.target.value)} aria-label="Explanation level"><option value="beginner">Beginner · plain language</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced · more technical</option></select></div></div>
           <div className="panel setting-section"><div className="setting-head"><span className="setting-icon captions-setting"><Headphones size={18} /></span><div><h2>Caption display</h2><p>Adjust readability to suit you.</p></div></div><div className="setting-row range-row"><div><strong>Caption text size</strong><span>{fontSize}px</span></div><input type="range" min="16" max="30" value={fontSize} onChange={(event) => setFontSize(Number(event.target.value))} aria-label="Caption text size" /></div><div className="setting-row range-row"><div><strong>Line spacing</strong><span>{lineSpacing.toFixed(1)}×</span></div><input type="range" min="1.3" max="2.2" step="0.1" value={lineSpacing} onChange={(event) => setLineSpacing(Number(event.target.value))} aria-label="Caption line spacing" /></div><div className="caption-preview" style={{ "--caption-size": `${fontSize}px`, "--caption-leading": lineSpacing } as React.CSSProperties}><span>CAPTION PREVIEW</span><p>Every voice understood.<br />Every idea within reach.</p></div></div>
           <div className="panel setting-section"><div className="setting-head"><span className="setting-icon access-setting"><Accessibility size={18} /></span><div><h2>Visual & motion preferences</h2><p>Change contrast, theme, and motion.</p></div></div><ToggleRow title="High contrast" text="Increase edge and text contrast across the interface." checked={highContrast} onChange={setHighContrast} /><ToggleRow title="Larger interface text" text="Increase the size of interface labels and controls." checked={largeText} onChange={setLargeText} /><ToggleRow title="Reduce motion" text="Limit nonessential movement and smooth scrolling." checked={reducedMotion} onChange={setReducedMotion} /><ToggleRow title="Dark appearance" text="Use a low-light theme for the workspace." checked={dark} onChange={setDark} /></div></div>
-        <aside className="settings-aside"><div className="panel settings-note"><span className="note-shield"><ShieldCheck size={20} /></span><h3>Designed to be yours</h3><p>Preferences and saved notes stay in your browser. Transcript context is temporary and expires after 30 minutes.</p><div className="settings-divider" /><p>Microphone access is only requested when you start a live session. AccessForAll does not retain raw audio.</p></div><div className="panel setting-shortcut"><span className="shortcut-icon"><CircleHelp size={18} /></span><strong>Need another way to access?</strong><p>Use Tab to move through controls. Focus rings remain visible as you navigate.</p><button className="text-link" onClick={() => openPage("live")}>Open live session <ArrowRight size={14} /></button></div></aside></div></section>}
+        <aside className="settings-aside"><div className="panel settings-note"><Image className="settings-note-art motion-art" src="/images/notebook-illustration.webp" alt="" aria-hidden="true" width={1024} height={1024} /><span className="note-shield"><ShieldCheck size={20} /></span><h3>Designed to be yours</h3><p>Preferences and saved notes stay in your browser. Transcript context is temporary and expires after 30 minutes.</p><div className="settings-divider" /><p>Microphone access is only requested when you start a live session. AccessForAll does not retain raw audio.</p></div><div className="panel setting-shortcut"><span className="shortcut-icon"><CircleHelp size={18} /></span><strong>Need another way to access?</strong><p>Use Tab to move through controls. Focus rings remain visible as you navigate.</p><button className="text-link" onClick={() => openPage("live")}>Open live session <ArrowRight size={14} /></button></div></aside></div></section>}
       </div>
     </main>
+    {profileOpen && <div className="profile-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setProfileOpen(false); }}>
+      <section className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-dialog-title" onKeyDown={(event) => {
+        if (event.key !== "Tab") return;
+        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled])'));
+        const first = controls[0]; const last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }}>
+        <div className="profile-modal-heading"><div><span className="eyebrow">YOUR WORKSPACE</span><h2 id="profile-dialog-title">Edit profile</h2><p>These details stay in this browser.</p></div><button type="button" className="icon-button" onClick={() => setProfileOpen(false)} aria-label="Close profile editor"><X size={18} /></button></div>
+        <form onSubmit={saveProfile}>
+          <label htmlFor="profile-display-name">Display name</label>
+          <input ref={profileNameInputRef} id="profile-display-name" value={profileDraftName} onChange={(event) => setProfileDraftName(event.target.value)} maxLength={80} autoComplete="name" required />
+          <label htmlFor="profile-role">Role or team <span>Optional</span></label>
+          <input id="profile-role" value={profileDraftRole} onChange={(event) => setProfileDraftRole(event.target.value)} maxLength={80} placeholder="e.g. Product designer" />
+          <div className="profile-modal-actions"><button type="button" className="button button-secondary" onClick={() => setProfileOpen(false)}>Cancel</button><button type="submit" className="button button-primary"><Check size={16} /> Save profile</button></div>
+        </form>
+      </section>
+    </div>}
     <div className="sr-only" aria-live="polite" aria-atomic="true">{announce}</div>
   </div>;
 }
