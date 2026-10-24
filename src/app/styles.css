@@ -569,3 +569,115 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   .setting-row { align-items:flex-start; flex-direction:column; }
   .setting-row select { width:100%; max-width:none; }
 }
+
+/* Readability scale: larger type and touchable controls across the workspace. */
+body { font-size:16px; }
+.app-shell { font-size:16px; }
+.app-shell.large-text { font-size:18px; }
+@media (min-width:801px) {
+  .sidebar { width:260px; padding-inline:18px; }
+  .main-shell { width:calc(100% - 260px); margin-left:260px; }
+}
+.brand { margin-bottom:42px; }
+.access-logo-symbol { width:38px; height:38px; }
+.access-logo-wordmark { font-size:19px; }
+.workspace-label { font-size:11px; }
+.nav-item { min-height:46px; font-size:15px; }
+.nav-label { font-size:15px; }
+.user-copy strong { font-size:14px; }
+.user-copy span { font-size:12px; }
+.privacy-card strong { font-size:12px; }
+.privacy-card p { font-size:11px; }
+.page-title-row h1,.home-heading h1 { font-size:clamp(36px,3.5vw,46px); }
+.live-page .page-title-row h1 { font-size:clamp(36px,3.3vw,44px); }
+.page-title-row p,.home-heading p { font-size:16px; }
+.eyebrow { font-size:12px; }
+.button { min-height:48px; padding-inline:19px; font-size:15px; }
+.icon-button,.more-button { width:48px; height:48px; min-width:48px; min-height:48px; }
+.notice-bar { font-size:14px; line-height:1.55; padding:12px 15px; }
+.live-toolbar .button { min-height:52px; font-size:15px; }
+.session-status strong { font-size:16px; }
+.session-status>div>span,.timer { font-size:14px; }
+.live-label,.caption-tag { font-size:12px; }
+.transcript-head h2 { font-size:20px; }
+.caption-options { font-size:13px; }
+.caption-meta { font-size:13px; }
+.caption-meta span:last-child { font-size:12px; }
+.caption-block>p { font-size:var(--caption-size); }
+.translated-caption { font-size:clamp(18px,calc(var(--caption-size) * .82),22px); }
+.transcript-empty strong { font-size:21px; }
+.transcript-empty p { font-size:16px; }
+.transcript-empty>span,.transcript-foot { font-size:13px; }
+.action-card strong { font-size:15px; }
+.action-card small { font-size:13px; }
+.assistant-heading h2 { font-size:20px; }
+.assistant-heading p,.grounding-note,.assistant-response p,.suggested-questions button,.ask-form textarea { font-size:14px; }
+.suggested-label,.answer-label,.agent-badge { font-size:12px; }
+.accommodation-strip strong { font-size:16px; }
+.accommodation-strip p,.accommodation-strip textarea { font-size:14px; }
+.home-session-copy h2 { font-size:21px; }
+.home-session-copy p,.home-empty-line { font-size:15px; }
+.home-section-heading h2 { font-size:18px; }
+.home-bottom-links strong { font-size:15px; }
+.home-bottom-links small { font-size:13px; }
+.notes-count,.note-date { font-size:13px; }
+.saved-note-card h3 { font-size:16px; }
+.saved-note-card p,.note-markdown pre,.note-takeaway p,.note-timestamp p { font-size:16px; }
+.note-timestamp time { font-size:13px; }
+.notes-empty h2 { font-size:30px; }
+.notes-empty p { font-size:16px; }
+.setting-head h2 { font-size:20px; }
+.setting-head p,.setting-row span,.settings-note p,.setting-shortcut p { font-size:14px; }
+.setting-row strong,.settings-note h3,.setting-shortcut strong { font-size:15px; }
+.setting-section select,.search-field input { font-size:15px; }
+.explore-form-head h2 { font-size:18px; }
+.explore-form-head p,.explore-form>label,.explore-form>textarea { font-size:15px; }
+.explore-prefs span { font-size:12px; }
+.explore-prefs strong,.explore-prefs select { font-size:14px; }
+.agenda-label,.sample-agenda-chip { font-size:12px; }
+.agenda-time { font-size:13px; }
+.agenda-card-content strong { font-size:15px; }
+.agenda-card-content span { font-size:13px; }
+.upload-label { font-size:14px; }
+
+@media (max-width:800px) {
+  .access-logo-symbol { width:34px; height:34px; }
+  .access-logo-wordmark { font-size:17px; }
+  .nav-item { min-height:50px; }
+  .nav-label { font-size:11px; }
+  .page-content { padding-top:24px; }
+  .page-title-row h1,.home-heading h1 { font-size:34px; }
+  .live-page .page-title-row h1 { font-size:32px; }
+  .page-title-row p,.home-heading p { font-size:15px; }
+  .notice-bar { font-size:13px; }
+  .live-toolbar .button { font-size:14px; }
+  .caption-options { font-size:12px; }
+  .transcript-body { padding:24px 22px; }
+  .action-card { min-height:70px; }
+  .assistant-column { font-size:15px; }
+  .setting-head h2 { font-size:19px; }
+}
+@media (max-width:520px) {
+  .page-content { padding:22px 15px 48px; }
+  .page-title-row h1,.home-heading h1 { font-size:32px; }
+  .live-page .page-title-row h1 { font-size:30px; }
+  .title-controls .select-pill { min-height:44px; }
+  .live-toolbar { min-height:132px; padding:14px; }
+  .live-toolbar>.button { min-width:132px; min-height:50px; font-size:13px; }
+  .session-status strong { font-size:15px; }
+  .session-status>div>span,.timer { font-size:13px; }
+  .caption-options { font-size:12px; }
+  .caption-block>p { font-size:var(--caption-size); }
+  .translated-caption { font-size:18px; }
+  .transcript-empty strong { font-size:19px; }
+  .transcript-empty p { font-size:15px; }
+  .transcript-empty>span,.transcript-foot { font-size:12px; }
+  .action-card strong { font-size:15px; }
+  .action-card small { font-size:13px; }
+  .notes-page .page-title-row { align-items:flex-start; }
+  .notes-empty { padding-inline:12px; }
+  .notes-empty h2 { font-size:27px; }
+  .notes-empty p { font-size:15px; }
+  .explore-prefs span { font-size:11px; }
+  .explore-prefs strong,.explore-prefs select { font-size:13px; }
+}

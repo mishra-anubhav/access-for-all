@@ -31,7 +31,7 @@ export default function AccessApp() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [language, setLanguage] = useState<Language>("en");
   const [level, setLevel] = useState("beginner");
-  const [fontSize, setFontSize] = useState(19);
+  const [fontSize, setFontSize] = useState(22);
   const [lineSpacing, setLineSpacing] = useState(1.65);
   const [listening, setListening] = useState(false);
   const [permission, setPermission] = useState("Not requested");
@@ -80,7 +80,9 @@ export default function AccessApp() {
       const prefs = JSON.parse(localStorage.getItem("accessforall:prefs") || "{}");
       setDark(Boolean(prefs.dark)); setHighContrast(Boolean(prefs.highContrast)); setLargeText(Boolean(prefs.largeText));
       setReducedMotion(Boolean(prefs.reducedMotion)); setLanguage(prefs.language || "en"); setLevel(prefs.level || "beginner");
-      setFontSize(Number(prefs.fontSize) || 19); setLineSpacing(Number(prefs.lineSpacing) || 1.65);
+      const storedCaptionSize = Number(prefs.fontSize);
+      setFontSize(Number.isFinite(storedCaptionSize) && storedCaptionSize > 0 ? storedCaptionSize : 22);
+      setLineSpacing(Number(prefs.lineSpacing) || 1.65);
       setNotes(JSON.parse(localStorage.getItem("accessforall:notes") || "[]"));
     } catch { /* use accessible defaults */ }
   }, []);
